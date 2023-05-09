@@ -113,7 +113,7 @@ class GHGRP_API:
         table: str,
         reporting_year: Optional[int] = None,
         rows: Optional[int] = None,
-    ):
+    ) -> pd.DataFrame:
         """
         Query a table from the EPA API, 10,000 rows at a time.
 
@@ -136,40 +136,27 @@ class GHGRP_API:
         reporting_year_query = self.get_reporting_year_query(
             table=table, reporting_year=reporting_year
         )
+        max_row = rows or self.get_row_count(
+            table=table, custom_query=reporting_year_query
+        )
 
-        if rows is None:  # download all rows
-            n_rows = self.get_row_count(table=table, custom_query=reporting_year_query)
-            ghgrp_data = []
+        # slice into 10,000 row chunks because the EPA API has a limit of 10,000 rows
+        row_range_without_max = np.arange(start=0, stop=max_row, step=10000, dtype=int)
+        row_range = np.append(
+            row_range_without_max, max_row
+        )  # append last row because np.arange does not include stop
 
-            # EPA API can only handle 10,000 records at a time.
-            if n_rows < 10000:
-                ghgrp_data = self.get_table_slice(
-                    table=table,
-                    start_row=0,
-                    end_row=n_rows,
-                    custom_query=reporting_year_query,
-                )
-            else:
-                rrange = np.append(
-                    np.arange(start=0, stop=n_rows, step=10000, dtype=int), n_rows
-                )
-                for n in range(len(rrange) - 1):
-                    r_records = self.get_table_slice(
-                        table=table,
-                        start_row=rrange[n],
-                        end_row=rrange[n + 1],
-                        custom_query=reporting_year_query,
-                    )
-                    ghgrp_data.append(r_records)
-                ghgrp_data = pd.concat(ghgrp_data)
-        else:
-            ghgrp_data = self.get_table_slice(
+        ghgrp_data = []
+        for n in range(len(row_range) - 1):
+            table_slice = self.get_table_slice(
                 table=table,
-                start_row=0,
-                end_row=rows,
+                start_row=row_range[n],
+                end_row=row_range[n + 1],
                 custom_query=reporting_year_query,
             )
+            ghgrp_data.append(table_slice)
+        ghgrp_data = pd.concat(ghgrp_data)
 
-        ghgrp_data.drop_duplicates(inplace=True)  # Drop any duplicate row entries.
+        ghgrp_data.drop_duplicates(inplace=True)
 
         return ghgrp_data
