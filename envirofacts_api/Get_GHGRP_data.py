@@ -78,6 +78,7 @@ class GHGRP_API:
         return self.read_path(path)
 
     def get_row_count(self, table: str, custom_query: Optional[str] = None) -> int:
+        """Get the number of rows in a table."""
         custom_query = custom_query or ""
         path = f"{self.BASE_URL}/{table}/{custom_query}/count/csv"
         df = self.read_path(path)
@@ -92,11 +93,13 @@ class GHGRP_API:
     def get_reporting_year_query(
         self, table: str, reporting_year: Optional[int] = None
     ) -> str:
+        """Construct a custom_query to select a specific reporting year."""
         if reporting_year is None:
             return ""
         else:
             path = f"{self.BASE_URL}/{table}/rows/0:1/csv"
             df = self.read_path(path)
+            # EPA API has different column names for reporting year in different tables
             if "reporting_year" in df.columns.str.lower():
                 reporting_year_query = f"reporting_year/{reporting_year}"
             elif "year" in df.columns.str.lower():
@@ -106,7 +109,10 @@ class GHGRP_API:
             return reporting_year_query
 
     def get_data(
-        self, table, reporting_year: Optional[int] = None, rows: Optional[int] = None
+        self,
+        table: str,
+        reporting_year: Optional[int] = None,
+        rows: Optional[int] = None,
     ):
         """
         Query a table from the EPA API, 10,000 rows at a time.
@@ -116,9 +122,11 @@ class GHGRP_API:
         table: str
             Name of the GHGRP Envirofacts table to access.
         reporting_year: int, optional
-            Year of data to download. Default value is None, which will download all years of data.
+            Year of data to download. Default value is None, which will download
+            all years of data.
         rows: int, optional
-            Number of rows to download. Defaults value is None, which will download all rows of the table.
+            Number of rows to download. Defaults value is None, which will download
+            all rows of the table.
 
         Returns
         -------
@@ -129,25 +137,21 @@ class GHGRP_API:
             table=table, reporting_year=reporting_year
         )
 
-        if rows is None:
-            # Get number of rows of request, if not specified.
-            # If rows is None then all rows of the table will be requested.
-            nrecords = self.get_row_count(
-                table=table, custom_query=reporting_year_query
-            )
+        if rows is None:  # download all rows
+            n_rows = self.get_row_count(table=table, custom_query=reporting_year_query)
             ghgrp_data = []
 
             # EPA API can only handle 10,000 records at a time.
-            if nrecords < 10000:
+            if n_rows < 10000:
                 ghgrp_data = self.get_table_slice(
                     table=table,
                     start_row=0,
-                    end_row=nrecords,
+                    end_row=n_rows,
                     custom_query=reporting_year_query,
                 )
             else:
                 rrange = np.append(
-                    np.arange(start=0, stop=nrecords, step=10000, dtype=int), nrecords
+                    np.arange(start=0, stop=n_rows, step=10000, dtype=int), n_rows
                 )
                 for n in range(len(rrange) - 1):
                     r_records = self.get_table_slice(
