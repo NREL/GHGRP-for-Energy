@@ -149,7 +149,6 @@ class GHGRP_API:
                 rrange = np.append(
                     np.arange(start=0, stop=nrecords, step=10000, dtype=int), nrecords
                 )
-                # Call
                 for n in range(len(rrange) - 1):
                     r_records = self.get_table_slice(
                         table=table,
